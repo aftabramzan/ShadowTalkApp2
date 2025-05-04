@@ -139,6 +139,86 @@ app.post('/api/create-post', async (req, res) => {
         connection.release();
     }
 });
+app.get('/api/search-public-profiles', async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        const { query } = req.query;
+
+        if (!query || query.trim() === "") {
+            return res.status(400).json({
+                status: "error",
+                message: "Search query is required"
+            });
+        }
+
+        const searchTerm = `%${query}%`;
+
+        // Query to fetch users with username visible and personal info visible
+        const [visibleUsers] = await connection.execute(
+            `SELECT 
+                u.First_Name, u.Last_Name, u.Anonymous_name, u.Name_visibility,
+                upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
+             FROM Users u
+             LEFT JOIN UserProfileImage upi ON u.UAID = upi.UAID
+             WHERE 
+                u.Name_visibility = 'visible'
+                AND u.PersonalInfo_visibility = 'visible'
+                AND (
+                    CONCAT(u.First_Name, ' ', u.Last_Name) LIKE ?
+                    OR u.Anonymous_name LIKE ?
+                )`,
+            [searchTerm, searchTerm]
+        );
+
+        // Query to fetch users with username visible but personal info hidden (only search by anonymous name)
+        const [hiddenPersonalInfoUsers] = await connection.execute(
+            `SELECT 
+                u.First_Name, u.Last_Name, u.Anonymous_name, u.Name_visibility,
+                upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
+             FROM Users u
+             LEFT JOIN UserProfileImage upi ON u.UAID = upi.UAID
+             WHERE 
+                u.Name_visibility = 'visible'
+                AND u.PersonalInfo_visibility = 'hidden'
+                AND u.Anonymous_name LIKE ?`,
+            [searchTerm]
+        );
+
+        // Combine both results
+        const allUsers = [...visibleUsers, ...hiddenPersonalInfoUsers];
+
+        const users = allUsers.map(user => {
+            const displayName = user.Name_visibility === 'visible'
+                ? `${user.First_Name} ${user.Last_Name}`
+                : user.Anonymous_name;
+
+            // Check if image visibility is allowed and show the appropriate image
+            const profileImage = user.Profile_visibility === 'visible'
+                ? (user.Real_Image ? Buffer.from(user.Real_Image).toString('base64') : null)
+                : (user.Hide_Image ? Buffer.from(user.Hide_Image).toString('base64') : null);
+
+            return {
+                name: displayName,
+                profile_image: profileImage
+            };
+        });
+
+        res.json({
+            status: "success",
+            users
+        });
+
+    } catch (error) {
+        console.error("Error searching public profiles:", error);
+        res.status(500).json({
+            status: "error",
+            message: error.message
+        });
+    } finally {
+        connection.release();
+    }
+});
 
 // New user creation endpoint
 app.post('/api/create-user', async (req, res) => {
