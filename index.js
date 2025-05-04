@@ -1026,7 +1026,7 @@ app.post('/api/delete-post', async (req, res) => {
 
         // Check if post exists
         const [existingPost] = await connection.execute(
-            `SELECT * FROM UserPost WHERE Post_ID = ?`,
+            `SELECT * FROM UserPost WHERE PID = ?`,
             [post_id]
         );
 
