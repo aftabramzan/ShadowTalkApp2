@@ -374,7 +374,6 @@ app.post('/api/upload-profile-image', async (req, res) => {
     }
 });
 
-// Complete profile creation endpoint
 app.post('/api/create-complete-profile', async (req, res) => {
     const connection = await pool.getConnection();
     
@@ -394,7 +393,10 @@ app.post('/api/create-complete-profile', async (req, res) => {
                 postal_code,
                 uaid,
                 real_image,
-                hide_image
+                hide_image,
+                emailvisible,
+                uservisible,
+                imagevisible
             } = req.body;
 
             // Validate required fields
@@ -420,14 +422,14 @@ app.post('/api/create-complete-profile', async (req, res) => {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     first_name, middle_name, last_name, age, country, city,
-                    anonymous_name, postal_code, uaid, 'visible', 'visible'
+                    anonymous_name, postal_code, uaid, uservisible, emailvisible
                 ]
             );
 
             // 2. Insert into UserProfileImage table
             await connection.execute(
                 'INSERT INTO UserProfileImage (Real_Image, Hide_Image, UAID, Profile_visibility) VALUES (?, ?, ?, ?)',
-                [realImageBuffer, hideImageBuffer, uaid, 'visible']
+                [realImageBuffer, hideImageBuffer, uaid, imagevisible]
             );
 
             // Commit transaction
@@ -454,6 +456,212 @@ app.post('/api/create-complete-profile', async (req, res) => {
     }
 });
 
+app.post('/api/update-complete-profile', async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        try {
+            const {
+                first_name,
+                middle_name,
+                last_name,
+                age,
+                country,
+                city,
+                anonymous_name,
+                postal_code,
+                uaid,
+                real_image,
+                hide_image,
+                emailvisible,
+                uservisible,
+                imagevisible
+            } = req.body;
+
+            if (!uaid) {
+                return res.status(400).json({
+                    status: "error",
+                    message: "Missing required field: uaid"
+                });
+            }
+
+            // 1. Update Users table
+            const userFields = [];
+            const userValues = [];
+
+            if (first_name !== undefined) {
+                userFields.push("First_Name = ?");
+                userValues.push(first_name);
+            }
+            if (middle_name !== undefined) {
+                userFields.push("Middle_Name = ?");
+                userValues.push(middle_name);
+            }
+            if (last_name !== undefined) {
+                userFields.push("Last_Name = ?");
+                userValues.push(last_name);
+            }
+            if (age !== undefined) {
+                userFields.push("Age = ?");
+                userValues.push(age);
+            }
+            if (country !== undefined) {
+                userFields.push("Country = ?");
+                userValues.push(country);
+            }
+            if (city !== undefined) {
+                userFields.push("City = ?");
+                userValues.push(city);
+            }
+            if (anonymous_name !== undefined) {
+                userFields.push("Anonymous_name = ?");
+                userValues.push(anonymous_name);
+            }
+            if (postal_code !== undefined) {
+                userFields.push("Postal_Code = ?");
+                userValues.push(postal_code);
+            }
+            if (uservisible !== undefined) {
+                userFields.push("Name_visibility = ?");
+                userValues.push(uservisible);
+            }
+            if (emailvisible !== undefined) {
+                userFields.push("PersonalInfo_visibility = ?");
+                userValues.push(emailvisible);
+            }
+
+            if (userFields.length > 0) {
+                userValues.push(uaid);
+                const userUpdateQuery = `
+                    UPDATE Users 
+                    SET ${userFields.join(', ')} 
+                    WHERE UAID = ?
+                `;
+                await connection.execute(userUpdateQuery, userValues);
+            }
+
+            // 2. Update UserProfileImage table
+            const imageFields = [];
+            const imageValues = [];
+
+            if (real_image !== undefined) {
+                const realImageBuffer = Buffer.from(real_image, 'base64');
+                imageFields.push("Real_Image = ?");
+                imageValues.push(realImageBuffer);
+            }
+            if (hide_image !== undefined) {
+                const hideImageBuffer = Buffer.from(hide_image, 'base64');
+                imageFields.push("Hide_Image = ?");
+                imageValues.push(hideImageBuffer);
+            }
+            if (imagevisible !== undefined) {
+                imageFields.push("Profile_visibility = ?");
+                imageValues.push(imagevisible);
+            }
+
+            if (imageFields.length > 0) {
+                imageValues.push(uaid);
+                const imageUpdateQuery = `
+                    UPDATE UserProfileImage 
+                    SET ${imageFields.join(', ')} 
+                    WHERE UAID = ?
+                `;
+                await connection.execute(imageUpdateQuery, imageValues);
+            }
+
+            await connection.commit();
+
+            res.json({
+                status: "success",
+                message: "Profile updated successfully"
+            });
+
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({
+            status: "error",
+            message: error.message
+        });
+    } finally {
+        connection.release();
+    }
+});
+
+app.get('/api/get-user/:uaid', async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        const uaid = req.params.uaid;
+
+        if (!uaid) {
+            return res.status(400).json({
+                status: "error",
+                message: "Missing UAID"
+            });
+        }
+
+        const [userData] = await connection.execute(
+            `SELECT 
+                ua.Username, ua.Email, ua.Username_visibility, 
+                u.First_Name, u.Middle_Name, u.Last_Name, u.Anonymous_name,
+                u.Name_visibility, u.PersonalInfo_visibility, u.Age, u.Country, u.City, u.Postal_Code,
+                upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
+             FROM UserAuthentication ua
+             LEFT JOIN Users u ON ua.UAID = u.UAID
+             LEFT JOIN UserProfileImage upi ON ua.UAID = upi.UAID
+             WHERE ua.UAID = ?`,
+            [uaid]
+        );
+
+        if (userData.length === 0) {
+            return res.status(404).json({
+                status: "error",
+                message: "User not found"
+            });
+        }
+
+        const user = userData[0];
+
+        res.json({
+            status: "success",
+            user: {
+                username: user.Username,
+                email: user.Email,
+                username_visibility: user.Username_visibility,
+                name_visibility: user.Name_visibility,
+                personal_info_visibility: user.PersonalInfo_visibility,
+                profile_visibility: user.Profile_visibility,
+
+                first_name: user.First_Name,
+                middle_name: user.Middle_Name,
+                last_name: user.Last_Name,
+                anonymous_name: user.Anonymous_name,
+                age: user.Age,
+                country: user.Country,
+                city: user.City,
+                postal_code: user.Postal_Code,
+
+                real_image: user.Real_Image ? Buffer.from(user.Real_Image).toString('base64') : null,
+                hide_image: user.Hide_Image ? Buffer.from(user.Hide_Image).toString('base64') : null
+            }
+        });
+
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({
+            status: "error",
+            message: error.message
+        });
+    } finally {
+        connection.release();
+    }
+});
 // User registration endpoint
 app.post('/api/register', async (req, res) => {
     const connection = await pool.getConnection();
@@ -674,52 +882,6 @@ app.get('/api/get-messages/:uaid', async (req, res) => {
     }
 });
 
-// Search users by username
-app.get('/api/search-users/:username', async (req, res) => {
-    const connection = await pool.getConnection();
-    
-    try {
-        const { username } = req.params;
-
-        const [users] = await connection.execute(
-            `SELECT ua.Username, ua.Username_visibility, u.First_Name, u.Last_Name, 
-                    u.Anonymous_name, u.Name_visibility, upi.Real_Image, upi.Hide_Image, 
-                    upi.Profile_visibility
-             FROM UserAuthentication ua
-             LEFT JOIN Users u ON ua.UAID = u.UAID
-             LEFT JOIN UserProfileImage upi ON ua.UAID = upi.UAID
-             WHERE ua.Username LIKE ? AND ua.Action = 'A'
-             LIMIT 10`,
-            [`%${username}%`]
-        );
-
-        // Process users to handle visibility
-        const processedUsers = users.map(user => ({
-            username: user.Username_visibility === 'visible' ? user.Username : 'Anonymous',
-            name: user.Name_visibility === 'visible' ? 
-                  `${user.First_Name} ${user.Last_Name}` : 
-                  user.Anonymous_name,
-            profile_image: user.Profile_visibility === 'visible' ? 
-                          Buffer.from(user.Real_Image).toString('base64') : 
-                          Buffer.from(user.Hide_Image).toString('base64')
-        }));
-
-        res.json({
-            success: true,
-            users: processedUsers
-        });
-
-    } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to search users"
-        });
-    } finally {
-        connection.release();
-    }
-});
-
 // Update post endpoint
 app.put('/api/update-post/:pid', async (req, res) => {
     const connection = await pool.getConnection();
@@ -772,102 +934,44 @@ app.put('/api/update-post/:pid', async (req, res) => {
     }
 });
 
-// Delete post endpoint
-app.delete('/api/delete-post/:pid', async (req, res) => {
+app.post('/api/delete-post', async (req, res) => {
     const connection = await pool.getConnection();
-    
-    try {
-        const { pid } = req.params;
-        const { uaid } = req.body;
 
-        if (!uaid) {
-            return res.status(400).json({
-                success: false,
-                message: "Missing user authentication"
-            });
+    try {
+        const { post_id } = req.body;
+
+        if (!post_id) {
+            return res.status(400).json({ response: "Missing post_id" });
         }
 
-        // Check if post exists and belongs to the user
+        // Check if post exists
         const [existingPost] = await connection.execute(
-            "SELECT * FROM UserPost WHERE PID = ? AND UAID = ?",
-            [pid, uaid]
+            `SELECT * FROM UserPost WHERE Post_ID = ?`,
+            [post_id]
         );
 
         if (existingPost.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Post not found or unauthorized"
-            });
+            return res.status(404).json({ response: "Post not found" });
         }
 
-        // Delete post
+        // Delete the post
         await connection.execute(
-            "DELETE FROM UserPost WHERE PID = ?",
-            [pid]
+            `DELETE FROM UserPost WHERE Post_ID = ?`,
+            [post_id]
         );
 
-        res.json({
-            success: true,
-            message: "Post deleted successfully"
-        });
+        res.json({ response: "Post deleted successfully" });
+
     } catch (error) {
         console.error('Error:', error);
-        res.status(500).json({
-            success: false,
-            message: "Internal server error"
-        });
+        res.status(500).json({ response: "Error: " + error.message });
     } finally {
         connection.release();
     }
 });
 
-// Search user by username endpoint
-app.get('/api/search-user', async (req, res) => {
-    const connection = await pool.getConnection();
-    
-    try {
-        const { username } = req.query;
 
-        if (!username) {
-            return res.status(400).json({
-                success: false,
-                message: "Username is required"
-            });
-        }
 
-        // Search for users with matching username
-        const [users] = await connection.execute(
-            `SELECT ua.UAID, ua.Username, ua.Username_visibility,
-                    upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
-             FROM UserAuthentication ua
-             LEFT JOIN UserProfileImage upi ON ua.UAID = upi.UAID
-             WHERE ua.Username LIKE ? AND ua.Action = 'A'`,
-            [`%${username}%`]
-        );
-
-        // Format the response
-        const formattedUsers = users.map(user => ({
-            uaid: user.UAID,
-            username: user.Username_visibility === 'visible' ? user.Username : 'Anonymous',
-            profile_image: user.Profile_visibility === 'visible' && user.Real_Image ? 
-                         Buffer.from(user.Real_Image).toString('base64') : 
-                         user.Hide_Image ? Buffer.from(user.Hide_Image).toString('base64') : null
-        }));
-
-        res.json({
-            success: true,
-            users: formattedUsers
-        });
-    } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({
-            success: false,
-            message: "Internal server error"
-        });
-    } finally {
-        connection.release();
-    }
-});
 
 // Get user profile endpoint
 app.get('/api/profile/:uaid', async (req, res) => {
