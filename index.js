@@ -400,7 +400,7 @@ app.post('/api/create-complete-profile', async (req, res) => {
             } = req.body;
 
             // Validate required fields
-            const requiredFields = ['first_name', 'last_name', 'anonymous_name', 'uaid', 'real_image', 'hide_image'];
+            const requiredFields = ['first_name', 'last_name', 'anonymous_name', 'uaid'];
             const missingFields = requiredFields.filter(field => !req.body[field]);
 
             if (missingFields.length > 0) {
