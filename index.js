@@ -374,6 +374,8 @@ app.post('/api/upload-profile-image', async (req, res) => {
     }
 });
 
+
+
 app.post('/api/create-complete-profile', async (req, res) => {
     const connection = await pool.getConnection();
     
@@ -392,8 +394,6 @@ app.post('/api/create-complete-profile', async (req, res) => {
                 anonymous_name,
                 postal_code,
                 uaid,
-                real_image,
-                hide_image,
                 emailvisible,
                 uservisible,
                 imagevisible
@@ -410,9 +410,9 @@ app.post('/api/create-complete-profile', async (req, res) => {
                 });
             }
 
-            // Decode base64 images
-            const realImageBuffer = Buffer.from(real_image, 'base64');
-            const hideImageBuffer = Buffer.from(hide_image, 'base64');
+            // // Decode base64 images
+            // const realImageBuffer = Buffer.from(real_image, 'base64');
+            // const hideImageBuffer = Buffer.from(hide_image, 'base64');
 
             // 1. Insert into Users table
             const [userResult] = await connection.execute(
@@ -427,10 +427,10 @@ app.post('/api/create-complete-profile', async (req, res) => {
             );
 
             // 2. Insert into UserProfileImage table
-            await connection.execute(
-                'INSERT INTO UserProfileImage (Real_Image, Hide_Image, UAID, Profile_visibility) VALUES (?, ?, ?, ?)',
-                [realImageBuffer, hideImageBuffer, uaid, imagevisible]
-            );
+            // await connection.execute(
+            //     'INSERT INTO UserProfileImage (Real_Image, Hide_Image, UAID, Profile_visibility) VALUES (?, ?, ?, ?)',
+            //     [realImageBuffer, hideImageBuffer, uaid, imagevisible]
+            // );
 
             // Commit transaction
             await connection.commit();
