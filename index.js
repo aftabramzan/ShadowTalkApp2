@@ -1034,12 +1034,17 @@ app.post('/api/delete-post', async (req, res) => {
             return res.status(404).json({ response: "Post not found" });
         }
 
-        // Delete the post
-        await connection.execute(
-            `DELETE FROM UserPost WHERE PID = ?`,
-            [post_id]
-        );
+   // Delete comments for this post
+await connection.execute(
+    "DELETE FROM Comment WHERE PID = ?",
+    [post_id]
+);
 
+// Now delete the post
+await connection.execute(
+    "DELETE FROM UserPost WHERE PID = ?",
+    [post_id]
+);
         res.json({ response: "Post deleted successfully" });
 
     } catch (error) {
