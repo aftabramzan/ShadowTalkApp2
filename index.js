@@ -1036,7 +1036,7 @@ app.post('/api/delete-post', async (req, res) => {
 
         // Delete the post
         await connection.execute(
-            `DELETE FROM UserPost WHERE Post_ID = ?`,
+            `DELETE FROM UserPost WHERE PID = ?`,
             [post_id]
         );
 
