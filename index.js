@@ -707,6 +707,7 @@ app.get('/api/get-user/:uaid', async (req, res) => {
         }
 
         const user = userData[0];
+        console.log(JSON.stringify(user));
 
         res.json({
             status: "success",
