@@ -690,7 +690,7 @@ app.get('/api/get-user/:uaid', async (req, res) => {
             `SELECT 
                 ua.Username, ua.Email, ua.Username_visibility, 
                 u.First_Name, u.Middle_Name, u.Last_Name, u.Anonymous_name,
-                u.Name_visibility, u.PersonalInfo_visibility, u.Age, u.Country, u.City, u.Postal_Code,
+                u.Name_visibility, u.Age, u.Country, u.City, u.Postal_Code,
                 upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
              FROM UserAuthentication ua
              LEFT JOIN Users u ON ua.UAID = u.UAID
