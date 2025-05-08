@@ -739,6 +739,7 @@ app.get('/api/get-user/:uaid', async (req, res) => {
     }
 });
 // User registration endpoint
+// Registration endpoint
 app.post('/api/register', async (req, res) => {
     const connection = await pool.getConnection();
     
@@ -748,48 +749,105 @@ app.post('/api/register', async (req, res) => {
         // Validate required fields
         if (!email || !username || !password || !confirmPassword) {
             return res.status(400).json({
-                success: false,
-                message: "Missing required fields"
+                status: 'error',
+                message: 'Email, username, password, and confirm password are required'
             });
         }
 
         // Validate password match
         if (password !== confirmPassword) {
             return res.status(400).json({
-                success: false,
-                message: "Passwords do not match"
+                status: 'error',
+                message: 'Passwords do not match'
             });
         }
 
-        // Check if email or username already exists
-        const [existingUsers] = await connection.execute(
-            "SELECT * FROM UserAuthentication WHERE Email = ? OR Username = ?",
-            [email, username]
-        );
-
-        if (existingUsers.length > 0) {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
             return res.status(400).json({
-                success: false,
-                message: "Email or username already exists"
+                status: 'error',
+                message: 'Invalid email format'
             });
         }
 
-        // Insert new user
-        const [result] = await connection.execute(
-            "INSERT INTO UserAuthentication (Email, Username, Password, ConfirmPassword, PhoneNo) VALUES (?, ?, ?, ?, ?)",
-            [email, username, password, confirmPassword, phoneNo]
+        // Validate phone number format if provided
+        if (phoneNo) {
+            const phoneRegex = /^\+?[\d\s-]{10,15}$/;
+            if (!phoneRegex.test(phoneNo)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Invalid phone number format'
+                });
+            }
+        }
+
+        // Check if email already exists
+        const [existingEmail] = await connection.execute(
+            'SELECT UAID FROM UserAuthentication WHERE Email = ?',
+            [email]
         );
 
-        res.json({
-            success: true,
-            message: "User registered successfully",
-            uaid: result.insertId
-        });
+        if (existingEmail.length > 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Email already registered'
+            });
+        }
+
+        // Check if username already exists
+        const [existingUsername] = await connection.execute(
+            'SELECT UAID FROM UserAuthentication WHERE Username = ?',
+            [username]
+        );
+
+        if (existingUsername.length > 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Username already taken'
+            });
+        }
+
+        // Start transaction
+        await connection.beginTransaction();
+
+        try {
+            // Insert into UserAuthentication table
+            const [result] = await connection.execute(
+                `INSERT INTO UserAuthentication (
+                    Email, 
+                    Username, 
+                    Password, 
+                    ConfirmPassword,
+                    PhoneNo
+                ) VALUES (?, ?, ?, ?, ?)`,
+                [email, username, password, confirmPassword, phoneNo]
+            );
+
+            const uaid = result.insertId;
+
+            // Commit transaction
+            await connection.commit();
+
+            res.json({
+                status: 'success',
+                message: 'Registration successful',
+                uaid: uaid,
+                email: email,
+                username: username,
+                phoneNo: phoneNo
+            });
+
+        } catch (error) {
+            // Rollback transaction on error
+            await connection.rollback();
+            throw error;
+        }
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({
-            success: false,
-            message: "Internal server error"
+            status: 'error',
+            message: 'Registration failed: ' + error.message
         });
     } finally {
         connection.release();
