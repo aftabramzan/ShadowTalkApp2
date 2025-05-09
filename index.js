@@ -673,8 +673,7 @@ app.post('/api/update-complete-profile', async (req, res) => {
         connection.release();
     }
 });
-
-aapp.get('/api/get-user/:uaid', async (req, res) => {
+app.get('/api/get-user/:uaid', async (req, res) => {
     const connection = await pool.getConnection();
 
     try {
