@@ -3,10 +3,11 @@ const axios = require('axios');
 async function testRegister() {
     try {
         const response = await axios.post('http://localhost:5000/api/register', {
-            email: 'newuser@example.com',
-            username: 'newuser123',
+            email: 'janitaaaaa@gamil.com',
+            username: 'janitaaa123',
             password: 'password123',
-            confirm_password: 'password123'
+            confirmPassword: 'password123',
+            phoneNo: '+923322438858'
         });
 
         console.log('API Response:', response.data);

@@ -5,8 +5,7 @@ async function testPostAPI() {
         const response = await axios.post('http://localhost:5000/api/create-post', {
             uaid: 1,  // Replace with your actual UAID
             title: "Test Post Title",
-            content: "This is a test post content",
-            sentiment_score: 0.5,
+            content: "This is a test post content Good",
             s_id: 1  // Replace with your actual S_ID
         });
 

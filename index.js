@@ -2,10 +2,18 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const leoProfanity = require('leo-profanity');
+const Sentiment = require('sentiment');
+
+
+
+
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase JSON payload limit for base64 images
+const sentiment = new Sentiment();
+
 
 // Database configuration
 const dbConfig = {
@@ -23,16 +31,19 @@ app.post('/api/chat', async (req, res) => {
     try {
         const { uaid, message } = req.body;
 
+
         if (!uaid || !message) {
             return res.status(400).json({
                 success: false,
                 message: "Missing required parameters"
             });
         }
+        const analysis = sentiment.analyze(message);
+        const sentiment_score = analysis.score;  // score will be positive/negative/zero
+        console.log(sentiment_score);
 
         // Simple response logic (replace this with NLP logic later)
         const response_text = "Thanks for your message!";
-        const sentiment_score = 0.5; // Default
         const is_biased = 0; // Default non-biased
 
         // Get a connection from the pool
@@ -68,7 +79,13 @@ app.post('/api/create-post', async (req, res) => {
     const connection = await pool.getConnection();
     
     try {
-        const { uaid, title, content, sentiment_score = 0.0, s_id } = req.body;
+        const { uaid, title, content, s_id, image = null } = req.body;
+        const analysis = sentiment.analyze(content);
+        const sentiment_score = analysis.score;  // score will be positive/negative/zero
+        console.log(sentiment_score);
+        if (leoProfanity.check(content)) {
+            return res.status(400).json({ response: "Post contains inappropriate language" });
+        }
 
         // Validate required fields
         if (!uaid || !content) {
@@ -81,9 +98,9 @@ app.post('/api/create-post', async (req, res) => {
         try {
             // Insert post
             const [postResult] = await connection.execute(
-                `INSERT INTO UserPost (UAID, S_ID, Title, Content, SentimentsScore, Created_By) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [uaid, s_id, title, content, sentiment_score, uaid]
+                `INSERT INTO UserPost (UAID, S_ID, Title, Content, SentimentsScore, Created_By, image) 
+                 VALUES (?, ?, ?, ?, ?, ?,?)`,
+                [uaid, s_id, title, content, sentiment_score, uaid, image]
             );
 
             const post_id = postResult.insertId;
@@ -864,13 +881,19 @@ app.post('/api/add-comment', async (req, res) => {
     const connection = await pool.getConnection();
     
     try {
-        const { pid, uaid, comment_text, s_id, sentiment_score = 0.0 } = req.body;
+        const { pid, uaid, comment_text, s_id} = req.body;
 
         if (!pid || !uaid || !comment_text) {
             return res.status(400).json({
                 success: false,
                 message: "Missing required fields"
             });
+        }
+        const analysis = sentiment.analyze(comment_text);
+        const sentiment_score = analysis.score;  // score will be positive/negative/zero
+        console.log(sentiment_score);
+        if (leoProfanity.check(comment_text)) {
+            return res.status(400).json({ response: "Post contains inappropriate language" });
         }
 
         const [result] = await connection.execute(
@@ -1027,7 +1050,7 @@ app.put('/api/update-post/:pid', async (req, res) => {
     
     try {
         const { pid } = req.params;
-        const { uaid, title, content, sentiment_score } = req.body;
+        const { uaid, title, content } = req.body;
 
         // Validate required fields
         if (!uaid || !content) {
@@ -1036,6 +1059,13 @@ app.put('/api/update-post/:pid', async (req, res) => {
                 message: "Missing required fields"
             });
         }
+        const analysis = sentiment.analyze(content);
+        const sentiment_score = analysis.score;  // score will be positive/negative/zero
+        console.log(sentiment_score);
+        if (leoProfanity.check(content)) {
+            return res.status(400).json({ response: "Post contains inappropriate language" });
+        }
+
 
         // Check if post exists and belongs to the user
         const [existingPost] = await connection.execute(
