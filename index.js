@@ -673,6 +673,7 @@ app.post('/api/update-complete-profile', async (req, res) => {
         connection.release();
     }
 });
+//get Profile
 app.get('/api/get-user/:uaid', async (req, res) => {
     const connection = await pool.getConnection();
 
@@ -689,7 +690,9 @@ app.get('/api/get-user/:uaid', async (req, res) => {
         const [userData] = await connection.execute(
             `SELECT 
                 ua.Username, ua.Email, ua.Username_visibility, 
-                u.First_Name, u.Middle_Name, u.Last_Name, u.Anonymous_name,u.Age, u.Country, u.City, u.Postal_Code
+                u.First_Name, u.Middle_Name, u.Last_Name, u.Anonymous_name,
+                u.Name_visibility, u.PersonalInfo_visibility, u.Age, u.Country, u.City, u.Postal_Code,
+                upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
              FROM UserAuthentication ua
              LEFT JOIN Users u ON ua.UAID = u.UAID
              LEFT JOIN UserProfileImage upi ON ua.UAID = upi.UAID
@@ -711,6 +714,11 @@ app.get('/api/get-user/:uaid', async (req, res) => {
             user: {
                 username: user.Username,
                 email: user.Email,
+                username_visibility: user.Username_visibility,
+                name_visibility: user.Name_visibility,
+                personal_info_visibility: user.PersonalInfo_visibility,
+                profile_visibility: user.Profile_visibility,
+
                 first_name: user.First_Name,
                 middle_name: user.Middle_Name,
                 last_name: user.Last_Name,
