@@ -157,6 +157,129 @@ app.post('/api/create-post', async (req, res) => {
         connection.release();
     }
 });
+
+app.post('/api/like-post', async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        const { uaid, pid, s_id } = req.body;
+
+        // Validate required fields
+        if (!uaid || !pid) {
+            return res.status(400).json({ response: "Missing required fields" });
+        }
+
+        // Start transaction
+        await connection.beginTransaction();
+
+        try {
+            // Check if the user has already liked the post
+            const [existingLike] = await connection.execute(
+                `SELECT * FROM \`Like\` WHERE PID = ? AND UAID = ?`,
+                [pid, uaid]
+            );
+
+            if (existingLike.length > 0) {
+                return res.status(400).json({ response: "You have already liked this post" });
+            }
+
+            // Insert like
+            const [likeResult] = await connection.execute(
+                `INSERT INTO \`Like\` (PID, UAID, S_ID, Created_By) 
+                 VALUES (?, ?, ?, ?)`,
+                [pid, uaid, s_id, uaid]
+            );
+
+            // Commit transaction
+            await connection.commit();
+
+            res.json({ response: "Post liked successfully", like_id: likeResult.insertId });
+        } catch (error) {
+            // Rollback transaction on error
+            await connection.rollback();
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ response: "Error: " + error.message });
+    } finally {
+        connection.release();
+    }
+});
+app.post('/api/dislike-post', async (req, res) => {
+    const connection = await pool.getConnection();
+
+    try {
+        const { uaid, pid } = req.body;
+
+        // Validate required fields
+        if (!uaid || !pid) {
+            return res.status(400).json({ response: "Missing required fields" });
+        }
+
+        // Start transaction
+        await connection.beginTransaction();
+
+        try {
+            // Check if the user has already liked the post
+            const [existingLike] = await connection.execute(
+                `SELECT * FROM \`Like\` WHERE PID = ? AND UAID = ?`,
+                [pid, uaid]
+            );
+
+            if (existingLike.length === 0) {
+                return res.status(400).json({ response: "You have not liked this post yet" });
+            }
+
+            // Delete like (dislike action)
+            await connection.execute(
+                `DELETE FROM \`Like\` WHERE PID = ? AND UAID = ?`,
+                [pid, uaid]
+            );
+
+            // Commit transaction
+            await connection.commit();
+
+            res.json({ response: "Post disliked successfully" });
+        } catch (error) {
+            // Rollback transaction on error
+            await connection.rollback();
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ response: "Error: " + error.message });
+    } finally {
+        connection.release();
+    }
+});
+app.get('/api/post-likes/:pid', async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const { pid } = req.params;
+
+        // Fetch like count for a specific post
+        const [likeCountData] = await connection.execute(
+            `SELECT COUNT(*) AS like_count FROM \`Like\` WHERE PID = ?`, [pid]
+        );
+
+        const likeCount = likeCountData[0].like_count;
+
+        res.json({
+            response: "Like count fetched successfully",
+            pid: pid,
+            like_count: likeCount
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ response: "Error: " + error.message });
+    } finally {
+        connection.release();
+    }
+});
+
+
 app.get('/api/search-public-profiles', async (req, res) => {
     const connection = await pool.getConnection();
 
