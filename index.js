@@ -5,10 +5,6 @@ const cors = require('cors');
 const leoProfanity = require('leo-profanity');
 const Sentiment = require('sentiment');
 
-
-
-
-
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase JSON payload limit for base64 images
@@ -157,6 +153,50 @@ app.post('/api/create-post', async (req, res) => {
         connection.release();
     }
 });
+// all users 
+app.get('/api/get-all-users', async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const [results] = await connection.execute(`
+            SELECT 
+                ua.UAID,
+                ua.Username,
+                upi.Real_Image,
+                upi.Hide_Image,
+                upi.Profile_visibility
+            FROM UserAuthentication ua
+            LEFT JOIN UserProfileImage upi ON ua.UAID = upi.UAID
+            WHERE ua.Username_visibility = 'visible'
+        `);
+
+        const users = results.map(user => {
+            const profileImage = user.Profile_visibility === 'visible'
+                ? (user.Real_Image ? Buffer.from(user.Real_Image).toString('base64') : null)
+                : (user.Hide_Image ? Buffer.from(user.Hide_Image).toString('base64') : null);
+
+            return {
+                uaid: user.UAID,
+                username: user.Username,
+                profile_image: profileImage
+            };
+        });
+
+        res.json({
+            status: 'success',
+            users
+        });
+
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message
+        });
+    } finally {
+        connection.release();
+    }
+});
+
 app.get('/api/search-public-profiles', async (req, res) => {
     const connection = await pool.getConnection();
 
