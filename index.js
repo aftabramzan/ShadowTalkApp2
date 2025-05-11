@@ -1131,12 +1131,16 @@ app.get('/api/get-messages/:uaid', async (req, res) => {
         const { uaid } = req.params;
 
         const [messages] = await connection.execute(
-            `SELECT m.*, u.Anonymous_name, u.Name_visibility, upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
-             FROM Message m
-             LEFT JOIN Users u ON m.UAID = u.UAID
-             LEFT JOIN UserProfileImage upi ON m.UAID = upi.UAID
-             WHERE m.UAID = ? AND m.Action = 'A'
-             ORDER BY m.Created_on DESC`,
+        `SELECT m.*, u.Anonymous_name, u.Name_visibility, upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
+            FROM Message m
+            LEFT JOIN (
+                SELECT * FROM Users WHERE UAID = 2 LIMIT 1
+            ) AS u ON m.UAID = u.UAID
+            LEFT JOIN (
+                SELECT * FROM UserProfileImage WHERE UAID = 1 LIMIT 1
+            ) AS upi ON m.UAID = upi.UAID
+            WHERE m.UAID = ? AND m.Action = 'A'
+            ORDER BY m.Created_on DESC`,
             [uaid]
         );
 
