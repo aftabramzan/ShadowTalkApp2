@@ -306,7 +306,92 @@ app.get('/api/post-likes/:pid', async (req, res) => {
         connection.release();
     }
 });
+app.get('/api/view-public-profile/:uaid', async (req, res) => {
+    const connection = await pool.getConnection();
 
+    try {
+        const { uaid } = req.params;
+
+        if (!uaid) {
+            return res.status(400).json({
+                status: "error",
+                message: "Missing UAID"
+            });
+        }
+
+        // 1. Get user and profile image info
+        const [userRows] = await connection.execute(
+            `SELECT 
+                u.First_Name, u.Last_Name, u.Middle_Name, u.Age, u.Country, u.City,
+                u.Anonymous_name, u.Postal_Code, u.Name_visibility, u.PersonalInfo_visibility,
+                upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
+             FROM Users u
+             LEFT JOIN UserProfileImage upi ON u.UAID = upi.UAID
+             WHERE u.UAID = ?`,
+            [uaid]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(404).json({
+                status: "error",
+                message: "User not found"
+            });
+        }
+
+        const user = userRows[0];
+
+        // Profile Image
+        const profileImage = user.Profile_visibility === 'visible'
+            ? (user.Real_Image ? Buffer.from(user.Real_Image).toString('base64') : null)
+            : (user.Hide_Image ? Buffer.from(user.Hide_Image).toString('base64') : null);
+
+        // Name
+        const name = user.Name_visibility === 'visible'
+            ? ${user.First_Name} ${user.Last_Name}
+            : user.Anonymous_name;
+
+        // Personal Info
+        const personalInfo = user.PersonalInfo_visibility === 'visible' ? {
+            first_name: user.First_Name,
+            middle_name: user.Middle_Name,
+            last_name: user.Last_Name,
+            age: user.Age,
+            country: user.Country,
+            city: user.City,
+            postal_code: user.Postal_Code
+        } : null;
+
+        // 2. Get posts by user
+        const [posts] = await connection.execute(
+    `SELECT PID, Title, Content, Created_At 
+     FROM UserPost 
+     WHERE UAID = ? 
+     ORDER BY Created_At DESC`,
+    [uaid]
+);
+
+
+        res.json({
+            status: "success",
+            profile: {
+                name,
+                anonymous_name: user.Anonymous_name,
+                profile_image: profileImage,
+                personal_info: personalInfo,
+                posts
+            }
+        });
+
+    } catch (error) {
+        console.error("Error getting public profile:", error);
+        res.status(500).json({
+            status: "error",
+            message: error.message
+        });
+    } finally {
+        connection.release();
+    }
+});
 
 app.get('/api/search-public-profiles', async (req, res) => {
     const connection = await pool.getConnection();
