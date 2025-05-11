@@ -157,7 +157,35 @@ app.post('/api/create-post', async (req, res) => {
         connection.release();
     }
 });
+app.get('/api/get-post', async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        const { pid, uaid } = req.query;
 
+        // Get post data with likes count and user's like status
+        const [post] = await connection.execute(
+            `SELECT p.*, 
+                    COUNT(l.PID) as likes_count,
+                    EXISTS(SELECT 1 FROM \`Like\` WHERE PID = p.PID AND UAID = ?) as is_liked
+             FROM Post p
+             LEFT JOIN \`Like\` l ON p.PID = l.PID
+             WHERE p.PID = ?
+             GROUP BY p.PID`,
+            [uaid, pid]
+        );
+
+        if (post.length === 0) {
+            return res.status(404).json({ response: "Post not found" });
+        }
+
+        res.json(post[0]);
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ response: "Error: " + error.message });
+    } finally {
+        connection.release();
+    }
+});
 app.post('/api/like-post', async (req, res) => {
     const connection = await pool.getConnection();
 
