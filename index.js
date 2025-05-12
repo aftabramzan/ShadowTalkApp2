@@ -413,7 +413,7 @@ app.get('/api/search-public-profiles', async (req, res) => {
         // Query to fetch users with username visible and personal info visible
         const [visibleUsers] = await connection.execute(
             `SELECT 
-                u.First_Name, u.Last_Name, u.Anonymous_name, u.Name_visibility,
+                u.First_Name, u.Last_Name, u.Anonymous_name, u.Name_visibility, u.UAID,
                 upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
              FROM Users u
              LEFT JOIN UserProfileImage upi ON u.UAID = upi.UAID
@@ -430,7 +430,7 @@ app.get('/api/search-public-profiles', async (req, res) => {
         // Query to fetch users with username visible but personal info hidden (only search by anonymous name)
         const [hiddenPersonalInfoUsers] = await connection.execute(
             `SELECT 
-                u.First_Name, u.Last_Name, u.Anonymous_name, u.Name_visibility,
+                u.First_Name, u.Last_Name, u.Anonymous_name, u.Name_visibility, u.UAID,
                 upi.Real_Image, upi.Hide_Image, upi.Profile_visibility
              FROM Users u
              LEFT JOIN UserProfileImage upi ON u.UAID = upi.UAID
@@ -456,7 +456,8 @@ app.get('/api/search-public-profiles', async (req, res) => {
 
             return {
                 name: displayName,
-                profile_image: profileImage
+                profile_image: profileImage,
+                id: user.UAID
             };
         });
 
