@@ -88,6 +88,9 @@ app.post('/api/create-post', async (req, res) => {
         if (leoProfanity.check(content)) {
             return res.status(400).json({ response: "Post contains inappropriate language" });
         }
+          if (leoProfanity.check(title)) {
+            return res.status(400).json({ response: "Post title contains inappropriate language" });
+        }
 
         // Validate required fields
         if (!uaid || !content) {
@@ -1303,6 +1306,9 @@ app.put('/api/update-post/:pid', async (req, res) => {
         console.log(sentiment_score);
         if (leoProfanity.check(content)) {
             return res.status(400).json({ response: "Post contains inappropriate language" });
+        }
+          if (leoProfanity.check(title)) {
+            return res.status(400).json({ response: "Post title contains inappropriate language" });
         }
 
 
