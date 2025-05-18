@@ -1204,7 +1204,7 @@ app.get('/api/get-comments/:pid', async (req, res) => {
 //add message
 app.post('/api/add-message', async (req, res) => {
     const connection = await pool.getConnection();
-    
+
     try {
         const { uaid, s_id, cb_id, message_text, sentiment_score = 0.0 } = req.body;
 
@@ -1215,50 +1215,33 @@ app.post('/api/add-message', async (req, res) => {
             });
         }
 
-        // Step 1: Insert the message into the Message table
-        const insertMessageQuery = `
-            INSERT INTO Message (UAID, S_ID, CB_ID, Message_Text, SentimentsScore, Created_By) 
-            VALUES (?, ?, ?, ?, ?, ?)
+        // 1️⃣ Insert message
+        const [result] = await connection.execute(
+            `INSERT INTO Message (UAID, S_ID, CB_ID, Message_Text, SentimentsScore, Created_By) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [uaid, s_id, cb_id, message_text, sentiment_score, uaid]
+        );
+
+        // 2️⃣ Insert notification using raw SQL query (not prepared statement)
+        const notificationQuery = `
+            INSERT INTO Notifications (UAID, Sender_UAID, Type, ReferenceID, Message, IsRead)
+            VALUES (${s_id}, ${uaid}, 'message', NULL, 'User ${uaid} sent you a message', FALSE)
         `;
-        
-        connection.query(insertMessageQuery, [uaid, s_id, cb_id, message_text, sentiment_score, uaid], (err, result) => {
-            if (err) {
-                return res.status(500).json({
-                    success: false,
-                    message: "Failed to send message",
-                    error: err.message
-                });
-            }
+        await connection.query(notificationQuery); // 🔁 Use query instead of execute for raw SQL
 
-            // Step 2: Insert notification to the receiver about the new message
-            // Assuming s_id is the receiver's user ID
-            const sender = uaid;  // The user sending the message
-            const receiver = s_id; // The user receiving the message
-
-            if (sender !== receiver) {  // Don't send a notification to the sender
-                const insertNotificationQuery = `
-                    INSERT INTO Notifications (UAID, Sender_UAID, Type, ReferenceID, Message, IsRead) 
-                    VALUES (?, ?, ?, ?, ?, FALSE)
-                `;
-                connection.query(insertNotificationQuery, [receiver, sender, 'message', null, User ${sender} sent you a message], (notificationErr, notificationResult) => {
-                    if (notificationErr) {
-                        console.error('Notification error:', notificationErr);
-                    }
-                });
-            }
-
-            res.json({
-                success: true,
-                message: "Message sent successfully",
-                message_id: result.insertId
-            });
+        // ✅ Return response as valid JSON
+        res.json({
+            success: true,
+            message: "Message sent successfully",
+            message_id: result.insertId
         });
-        
+
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Error in /add-message:', error);
         res.status(500).json({
             success: false,
-            message: "Failed to send message"
+            message: "Failed to send message",
+            error: error.message
         });
     } finally {
         connection.release();
