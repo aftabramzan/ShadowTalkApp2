@@ -17,10 +17,10 @@ const sentiment = new Sentiment();
 
 // Database configuration
 const dbConfig = {
-    host: 'ballast.proxy.rlwy.net',
-    port: 36187,
-    user: 'root',
-    password: 'DvOaFEEahZudDBXyLLWCKGjMleRcmLDz',
+    host: '34.18.53.7',
+    port: 3306,
+    user: 'Swag',
+    password: '123swagkicks',
     database: 'railway'
 };
 
