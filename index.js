@@ -1218,7 +1218,7 @@ app.post('/api/add-message', async (req, res) => {
         // 1️⃣ Insert message
         const [result] = await connection.execute(
             `INSERT INTO Message (UAID, S_ID, CB_ID, Message_Text, SentimentsScore, Created_By) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?,'unseen')`,
             [uaid, s_id, cb_id, message_text, sentiment_score, uaid]
         );
 
