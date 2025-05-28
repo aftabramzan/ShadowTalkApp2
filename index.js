@@ -1229,7 +1229,7 @@ app.post('/api/add-message', async (req, res) => {
              VALUES (?, ?, 'message', NULL, ?, FALSE)`,
             [s_id, uaid, `User ${uaid} sent you a message`]
         );
-        await connection.query(notificationQuery); // 🔁 Use query instead of execute for raw SQL
+      // 🔁 Use query instead of execute for raw SQL
 
         // ✅ Return response as valid JSON
         res.json({
