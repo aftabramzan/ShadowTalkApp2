@@ -1215,18 +1215,20 @@ app.post('/api/add-message', async (req, res) => {
             });
         }
 
-        // 1️⃣ Insert message
+      
+        // 1️⃣ Insert message with Action = 'unseen'
         const [result] = await connection.execute(
-            `INSERT INTO Message (UAID, S_ID, CB_ID, Message_Text, SentimentsScore, Created_By) 
-             VALUES (?, ?, ?, ?, ?, ?,'unseen')`,
+            `INSERT INTO Message (UAID, S_ID, CB_ID, Message_Text, SentimentsScore, Created_By, Action) 
+             VALUES (?, ?, ?, ?, ?, ?, 'unseen')`,
             [uaid, s_id, cb_id, message_text, sentiment_score, uaid]
         );
 
-        // 2️⃣ Insert notification using raw SQL query (not prepared statement)
-        const notificationQuery = `
-            INSERT INTO Notifications (UAID, Sender_UAID, Type, ReferenceID, Message, IsRead)
-            VALUES (${s_id}, ${uaid}, 'message', NULL, 'User ${uaid} sent you a message', FALSE)
-        `;
+        // 2️⃣ Use prepared statement for notification (security fix)
+        await connection.execute(
+            `INSERT INTO Notifications (UAID, Sender_UAID, Type, ReferenceID, Message, IsRead)
+             VALUES (?, ?, 'message', NULL, ?, FALSE)`,
+            [s_id, uaid, `User ${uaid} sent you a message`]
+        );
         await connection.query(notificationQuery); // 🔁 Use query instead of execute for raw SQL
 
         // ✅ Return response as valid JSON
