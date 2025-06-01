@@ -167,7 +167,6 @@ app.get('/api/get-post', async (req, res) => {
     try {
         const { pid, uaid } = req.query;
 
-        // Get post data with likes count and user's like status
         const [post] = await connection.execute(
             `SELECT p.*, 
                     COUNT(l.PID) as likes_count,
@@ -183,7 +182,18 @@ app.get('/api/get-post', async (req, res) => {
             return res.status(404).json({ response: "Post not found" });
         }
 
-        res.json(post[0]);
+        const singlePost = post[0];
+
+        // ✅ Convert LONGBLOB image to base64
+        const postImage = singlePost.Image
+            ? `data:image/jpeg;base64,${singlePost.Image.toString('base64')}`
+            : null;
+
+        res.json({
+            ...singlePost,
+            Image: postImage  // Replace binary with base64
+        });
+
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ response: "Error: " + error.message });
@@ -191,6 +201,7 @@ app.get('/api/get-post', async (req, res) => {
         connection.release();
     }
 });
+
 app.post('/api/like-post', async (req, res) => {
     const connection = await pool.getConnection();
 
