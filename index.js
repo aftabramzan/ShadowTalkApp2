@@ -20,7 +20,7 @@ const dbConfig = {
     host: '34.18.53.7',
     port: 3306,
     user: 'Swag',
-    password: '123swagkicks',
+    password: 'swagkicks123',
     database: 'railway'
 };
 
